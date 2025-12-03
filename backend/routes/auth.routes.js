@@ -1,5 +1,5 @@
 import express from 'express';
-import { register, login, googleAuth, verifyEmail, resendVerification, getMe } from '../controllers/auth.controller.js';
+import { register, login, googleAuth, verifyEmail, resendVerification, getMe, deleteAccount } from '../controllers/auth.controller.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
@@ -13,6 +13,7 @@ router.post('/resend-verification', resendVerification);
 
 // Protected routes
 router.get('/me', authenticate, getMe);
+router.delete('/account', authenticate, deleteAccount);
 
 export default router;
 

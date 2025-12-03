@@ -28,7 +28,7 @@ const apiRequest = async (endpoint, options = {}) => {
 };
 
 export const authService = {
-  // Sign up new user with email/password
+  // Sign up new user with email/password - account created only after verification
   async signup(email, password, name) {
     try {
       const response = await apiRequest('/auth/register', {
@@ -36,15 +36,13 @@ export const authService = {
         body: JSON.stringify({ email, password, name }),
       });
 
-      if (response.status === 'success' && response.data) {
-        // Store token and user data
-        localStorage.setItem(STORAGE_KEY, response.data.token);
-        localStorage.setItem(USER_KEY, JSON.stringify(response.data.user));
-        
+      if (response.status === 'success') {
+        // Don't store token or user - account not created yet
+        // User needs to verify email first
         return {
-          user: response.data.user,
-          token: response.data.token,
-          emailVerificationToken: response.data.emailVerificationToken
+          success: true,
+          message: response.message || 'Verification email sent. Please check your inbox.',
+          email: response.data?.email
         };
       }
 
@@ -108,6 +106,7 @@ export const authService = {
     }
   },
 
+  
   // Sign in with Google
   async signInWithGoogle() {
     try {
@@ -136,21 +135,24 @@ export const authService = {
     }
   },
 
-  // Verify email with token
+  // Verify email with token - account is created here and user is logged in
   async verifyEmail(token) {
     try {
       const response = await apiRequest(`/auth/verify-email/${token}`, {
         method: 'GET',
       });
 
-      if (response.status === 'success') {
-        // Update user's emailVerified status
-        const user = this.getCurrentUser();
-        if (user) {
-          user.emailVerified = true;
-          localStorage.setItem(USER_KEY, JSON.stringify(user));
-        }
-        return { success: true, message: 'Email verified successfully!' };
+      if (response.status === 'success' && response.data) {
+        // Account is now created - store token and user data
+        localStorage.setItem(STORAGE_KEY, response.data.token);
+        localStorage.setItem(USER_KEY, JSON.stringify(response.data.user));
+        
+        return { 
+          success: true, 
+          message: response.message || 'Email verified successfully! Your account has been created.',
+          user: response.data.user,
+          token: response.data.token
+        };
       }
 
       throw new Error(response.message || 'Email verification failed.');

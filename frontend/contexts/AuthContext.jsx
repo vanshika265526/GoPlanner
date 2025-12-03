@@ -49,10 +49,9 @@ export const AuthProvider = ({ children }) => {
 
   const signup = async (email, password, name) => {
     try {
-      const { user: newUser } = await authService.signup(email, password, name);
-      setUser(newUser);
-      setIsAuthenticated(true);
-      return { success: true, user: newUser };
+      const result = await authService.signup(email, password, name);
+      // Don't set user/auth state - account not created until email verification
+      return { success: true, message: result.message };
     } catch (error) {
       return { success: false, error: error.message };
     }

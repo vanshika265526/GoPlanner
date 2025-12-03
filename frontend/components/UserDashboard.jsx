@@ -6,8 +6,12 @@ import { AppFooter } from './AppFooter';
 // Removed Firebase authService import - using backend API now
 
 export const UserDashboard = ({ onBack, onCreateTrip, onSavedPlans }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, loading } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  console.log('UserDashboard render - loading:', loading, 'user:', user, 'isAuthenticated:', useAuth().isAuthenticated);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -48,7 +52,75 @@ export const UserDashboard = ({ onBack, onCreateTrip, onSavedPlans }) => {
     }
   };
 
-  if (!user) return null;
+  const handleDeleteAccount = async () => {
+    if (!showDeleteConfirm) {
+      setShowDeleteConfirm(true);
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const token = localStorage.getItem('goplanner_token');
+      
+      const response = await fetch(`${API_URL}/auth/account`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` })
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (data.status === 'success') {
+        // Logout and redirect to home
+        await logout();
+        if (onBack) onBack();
+        alert('Your account and all associated data have been deleted successfully.');
+      } else {
+        alert('Failed to delete account: ' + (data.message || 'Unknown error'));
+      }
+    } catch (error) {
+      alert('Failed to delete account: ' + error.message);
+    } finally {
+      setIsDeletingAccount(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
+  // Show loading state while checking authentication
+  if (loading) {
+    return (
+      <div className="relative min-h-screen overflow-hidden bg-background-light text-slate-900 dark:bg-[#020617] dark:text-white transition-colors flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 mx-auto rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
+          <p className="text-slate-600 dark:text-white/70">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If no user, redirect to home or show message
+  if (!user) {
+    return (
+      <div className="relative min-h-screen overflow-hidden bg-background-light text-slate-900 dark:bg-[#020617] dark:text-white transition-colors flex items-center justify-center">
+        <div className="text-center space-y-4 max-w-md px-6">
+          <div className="w-16 h-16 mx-auto rounded-full bg-yellow-100 dark:bg-yellow-900/20 flex items-center justify-center">
+            <span className="material-symbols-outlined text-4xl text-yellow-600 dark:text-yellow-400">warning</span>
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Not Authenticated</h2>
+          <p className="text-slate-600 dark:text-white/70">Please sign in to access your dashboard.</p>
+          <button
+            onClick={onBack}
+            className="mt-4 px-6 py-3 rounded-full bg-primary hover:bg-primary-dark text-white font-semibold transition-colors"
+          >
+            Go to Home
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-background-light text-slate-900 dark:bg-[#020617] dark:text-white transition-colors">
@@ -206,18 +278,60 @@ export const UserDashboard = ({ onBack, onCreateTrip, onSavedPlans }) => {
               </div>
             </section>
 
-            {/* Logout Section */}
+            {/* Account Actions Section */}
             <section className="glass-panel rounded-[32px] p-6 text-center space-y-4">
               <Button
                 variant="secondary"
                 onClick={handleLogout}
                 isLoading={isLoggingOut}
-                disabled={isLoggingOut}
+                disabled={isLoggingOut || isDeletingAccount}
                 className="h-14 px-8"
                 icon="logout"
               >
                 Sign Out
               </Button>
+              
+              {showDeleteConfirm ? (
+                <div className="space-y-3 p-4 rounded-2xl bg-red-500/10 border border-red-500/30">
+                  <p className="text-sm font-semibold text-red-600 dark:text-red-400">
+                    Are you sure you want to delete your account? This action cannot be undone and will delete all your saved plans.
+                  </p>
+                  <div className="flex gap-3 justify-center">
+                    <Button
+                      variant="secondary"
+                      onClick={() => setShowDeleteConfirm(false)}
+                      disabled={isDeletingAccount}
+                      className="h-10 px-6"
+                    >
+                      Cancel
+                    </Button>
+                    <button
+                      onClick={handleDeleteAccount}
+                      disabled={isDeletingAccount}
+                      className="h-10 px-6 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {isDeletingAccount ? (
+                        <span className="material-symbols-outlined animate-spin">progress_activity</span>
+                      ) : (
+                        <>
+                          <span className="material-symbols-outlined">delete_forever</span>
+                          <span>Delete Account</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="secondary"
+                  onClick={handleDeleteAccount}
+                  disabled={isLoggingOut || isDeletingAccount}
+                  className="h-14 px-8 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800"
+                  icon="delete_forever"
+                >
+                  Delete Account
+                </Button>
+              )}
             </section>
           </div>
         </main>

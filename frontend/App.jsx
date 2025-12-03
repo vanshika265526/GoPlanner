@@ -16,7 +16,7 @@ import { AppScreen } from './types';
 import { downloadItineraryPDF } from './services/pdfService';
 
 function AppContent() {
-  const { login: authLogin, signup: authSignup, signInWithGoogle: authGoogleSignIn, isAuthenticated } = useAuth();
+  const { login: authLogin, signup: authSignup, signInWithGoogle: authGoogleSignIn, isAuthenticated, logout: authLogout } = useAuth();
   const [currentScreen, setCurrentScreen] = useState(AppScreen.LANDING);
   const [itinerary, setItinerary] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -27,6 +27,45 @@ function AppContent() {
   const [navigationHistory, setNavigationHistory] = useState([AppScreen.LANDING]);
   const [verificationToken, setVerificationToken] = useState(null);
   const [verificationStatus, setVerificationStatus] = useState(null);
+
+  // Handle email verification token from URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const pathToken = window.location.pathname.split('/verify-email/')[1];
+    const token = urlParams.get('token') || pathToken;
+    
+    if (token && !verificationToken) {
+      setVerificationToken(token);
+      setCurrentScreen(AppScreen.VERIFY_EMAIL);
+      setVerificationStatus(null);
+      
+      // Verify email
+      const verifyEmail = async () => {
+        try {
+          const { authService } = await import('./services/authService');
+          const result = await authService.verifyEmail(token);
+          
+          if (result.success && result.user && result.token) {
+            // Account created and user logged in - update auth context
+            setVerificationStatus('success');
+            // Refresh page to update auth state
+            setTimeout(() => {
+              window.location.href = '/';
+            }, 2000);
+          } else {
+            setVerificationStatus('error');
+          }
+        } catch (error) {
+          console.error('Verification error:', error);
+          setVerificationStatus('error');
+        }
+      };
+      
+      verifyEmail();
+      // Clean URL
+      window.history.replaceState({}, '', '/');
+    }
+  }, [verificationToken]);
 
   const handleStartPlanning = () => {
     setPrefillFormData(null);
@@ -161,14 +200,14 @@ function AppContent() {
     try {
       const result = await authSignup(data.email, data.password, data.name);
       if (result.success) {
-        // Show success message and redirect to home after signup
-        // User needs to verify email before full access
-        setError('Verification email sent! Please check your inbox and verify your email.');
-        // Wait a bit then go to home page
+        // Show success message and redirect to home immediately
+        // Account will only be created after email verification
+        setError('Verification email sent! Please check your inbox and verify your email to create your account.');
+        // Redirect to home page immediately
         setTimeout(() => {
           setCurrentScreen(AppScreen.LANDING);
           setError(null);
-        }, 3000);
+        }, 2000);
       } else {
         setError(result.error || 'Signup failed. Please try again.');
       }
@@ -404,6 +443,7 @@ function AppContent() {
   }
 
   if (currentScreen === AppScreen.DASHBOARD) {
+    console.log('Rendering UserDashboard, currentScreen:', currentScreen);
     return (
       <UserDashboard
         onBack={handleGoBack}
@@ -424,8 +464,7 @@ function AppContent() {
                 <span className="material-symbols-outlined text-4xl text-green-600 dark:text-green-400">check_circle</span>
               </div>
               <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Email Verified!</h2>
-              <p className="text-slate-600 dark:text-slate-400">Your email has been successfully verified. You can now use all features of GoPlanner.</p>
-              <Button onClick={() => setCurrentScreen(AppScreen.LANDING)}>Go to Home</Button>
+              <p className="text-slate-600 dark:text-slate-400">Your account has been created successfully! Redirecting to home page...</p>
             </>
           ) : verificationStatus === 'error' ? (
             <>
@@ -553,18 +592,6 @@ function AppContent() {
 }
 
 function App() {
-  // Check for email verification token in URL on mount
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const pathToken = window.location.pathname.split('/verify-email/')[1];
-    const token = urlParams.get('token') || pathToken;
-    
-    if (token) {
-      // This will be handled by AppContent component
-      window.history.replaceState({}, '', '/');
-    }
-  }, []);
-
   return (
     <AuthProvider>
       <AppContent />

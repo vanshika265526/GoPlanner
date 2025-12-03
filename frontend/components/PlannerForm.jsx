@@ -943,6 +943,4 @@ export const PlannerForm = ({ onSubmit, onCancel, initialData = null, onBack, on
   );
   }
 
-  // Step 3 is now merged into Step 2 with inline editing
-  // No separate Step 3 needed
 };
