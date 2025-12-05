@@ -79,14 +79,46 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const signInWithGoogle = async () => {
+
+  // Refresh auth state - useful after email verification or OTP verification
+  const refreshAuth = async () => {
+    setLoading(true);
     try {
-      const { user: googleUser } = await authService.signInWithGoogle();
-      setUser(googleUser);
-      setIsAuthenticated(true);
-      return { success: true, user: googleUser };
+      const token = authService.getToken();
+      const currentUser = authService.getCurrentUser();
+      
+      if (token && currentUser) {
+        // Verify token with backend to ensure it's still valid
+        const verifiedUser = await authService.verifyToken();
+        if (verifiedUser) {
+          setUser(verifiedUser);
+          setIsAuthenticated(true);
+        } else {
+          // Token invalid, clear everything
+          authService.logout();
+          setUser(null);
+          setIsAuthenticated(false);
+        }
+      } else if (token) {
+        // Token exists but no user in localStorage, verify token to get user
+        const verifiedUser = await authService.verifyToken();
+        if (verifiedUser) {
+          setUser(verifiedUser);
+          setIsAuthenticated(true);
+        } else {
+          setUser(null);
+          setIsAuthenticated(false);
+        }
+      } else {
+        setUser(null);
+        setIsAuthenticated(false);
+      }
     } catch (error) {
-      return { success: false, error: error.message };
+      console.error('Auth refresh error:', error);
+      setUser(null);
+      setIsAuthenticated(false);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -97,7 +129,7 @@ export const AuthProvider = ({ children }) => {
     signup,
     login,
     logout,
-    signInWithGoogle,
+    refreshAuth,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -98,14 +98,14 @@ export const ItineraryScreen = ({ itinerary, onBack, onDashboard, onEdit, onSave
           <div className="flex items-center justify-end gap-3">
             <button 
               onClick={() => onShare?.(plan)}
-              className="size-10 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center transition-colors"
+              className="size-10 rounded-full bg-slate-100 dark:bg-[#020617] hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center transition-colors"
               title="Share plan"
             >
               <span className="material-symbols-outlined text-slate-700 dark:text-slate-300">share</span>
             </button>
             <button 
               onClick={() => onDownload?.(plan)}
-              className="size-10 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center transition-colors"
+              className="size-10 rounded-full bg-slate-100 dark:bg-[#020617] hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center transition-colors"
               title="Download as PDF"
             >
               <span className="material-symbols-outlined text-slate-700 dark:text-slate-300">download</span>

@@ -28,7 +28,7 @@ const apiRequest = async (endpoint, options = {}) => {
 };
 
 export const authService = {
-  // Sign up new user with email/password - account created only after verification
+  // Sign up new user with email/password - sends OTP
   async signup(email, password, name) {
     try {
       const response = await apiRequest('/auth/register', {
@@ -38,10 +38,10 @@ export const authService = {
 
       if (response.status === 'success') {
         // Don't store token or user - account not created yet
-        // User needs to verify email first
+        // User needs to verify OTP first
         return {
           success: true,
-          message: response.message || 'Verification email sent. Please check your inbox.',
+          message: response.message || 'OTP sent to your email. Please check your inbox.',
           email: response.data?.email
         };
       }
@@ -60,6 +60,64 @@ export const authService = {
       
       throw new Error(errorMessage);
     }
+  },
+
+  // Verify OTP - account is created here and user is logged in
+  async verifyOTP(email, otp) {
+    try {
+      const response = await apiRequest('/auth/verify-otp', {
+        method: 'POST',
+        body: JSON.stringify({ email, otp }),
+      });
+
+      if (response.status === 'success' && response.data) {
+        // Account is now created - store token and user data
+        localStorage.setItem(STORAGE_KEY, response.data.token);
+        localStorage.setItem(USER_KEY, JSON.stringify(response.data.user));
+        
+        return { 
+          success: true, 
+          message: response.message || 'Email verified successfully! Your account has been created.',
+          user: response.data.user,
+          token: response.data.token
+        };
+      }
+
+      throw new Error(response.message || 'OTP verification failed.');
+    } catch (error) {
+      throw new Error(error.message || 'OTP verification failed.');
+    }
+  },
+
+  // Verify email with token - account is created here and user is logged in
+  async verifyEmail(token) {
+    try {
+      const response = await apiRequest(`/auth/verify-email/${token}`, {
+        method: 'GET',
+      });
+
+      if (response.status === 'success' && response.data) {
+        // Account is now created - store token and user data
+        localStorage.setItem(STORAGE_KEY, response.data.token);
+        localStorage.setItem(USER_KEY, JSON.stringify(response.data.user));
+        
+        return { 
+          success: true, 
+          message: response.message || 'Email verified successfully! Your account has been created.',
+          user: response.data.user,
+          token: response.data.token
+        };
+      }
+
+      throw new Error(response.message || 'Email verification failed.');
+    } catch (error) {
+      throw new Error(error.message || 'Email verification failed.');
+    }
+  },
+
+  // Resend OTP (alias for resendVerification)
+  async resendVerification(email) {
+    return this.resendOTP(email);
   },
 
   // Sign in existing user
@@ -106,81 +164,25 @@ export const authService = {
     }
   },
 
-  
-  // Sign in with Google
-  async signInWithGoogle() {
+
+  // Resend OTP
+  async resendOTP(email) {
     try {
-      // Load Google Identity Services
-      return new Promise((resolve, reject) => {
-        // Check if Google script is loaded
-        if (typeof google === 'undefined') {
-          // Load Google Identity Services script
-          const script = document.createElement('script');
-          script.src = 'https://accounts.google.com/gsi/client';
-          script.async = true;
-          script.defer = true;
-          script.onload = () => {
-            initializeGoogleSignIn(resolve, reject);
-          };
-          script.onerror = () => {
-            reject(new Error('Failed to load Google Sign-In script'));
-          };
-          document.head.appendChild(script);
-        } else {
-          initializeGoogleSignIn(resolve, reject);
-        }
-      });
-    } catch (error) {
-      throw new Error(error.message || 'Google sign-in failed');
-    }
-  },
-
-  // Verify email with token - account is created here and user is logged in
-  async verifyEmail(token) {
-    try {
-      const response = await apiRequest(`/auth/verify-email/${token}`, {
-        method: 'GET',
-      });
-
-      if (response.status === 'success' && response.data) {
-        // Account is now created - store token and user data
-        localStorage.setItem(STORAGE_KEY, response.data.token);
-        localStorage.setItem(USER_KEY, JSON.stringify(response.data.user));
-        
-        return { 
-          success: true, 
-          message: response.message || 'Email verified successfully! Your account has been created.',
-          user: response.data.user,
-          token: response.data.token
-        };
-      }
-
-      throw new Error(response.message || 'Email verification failed.');
-    } catch (error) {
-      throw new Error(error.message || 'Email verification failed.');
-    }
-  },
-
-  // Resend email verification
-  async resendVerificationEmail() {
-    try {
-      const user = this.getCurrentUser();
-      if (!user || !user.email) {
-        throw new Error('No user is currently signed in.');
-      }
-
       const response = await apiRequest('/auth/resend-verification', {
         method: 'POST',
-        body: JSON.stringify({ email: user.email }),
+        body: JSON.stringify({ email }),
       });
 
       if (response.status === 'success') {
-        return { success: true, message: 'Verification email sent. Please check your inbox.' };
+        return {
+          success: true,
+          message: response.message || 'OTP sent to your email. Please check your inbox.'
+        };
       }
 
-      throw new Error(response.message || 'Failed to send verification email.');
+      throw new Error(response.message || 'Failed to resend OTP.');
     } catch (error) {
-      throw new Error(error.message || 'Failed to send verification email.');
+      throw new Error(error.message || 'Failed to resend OTP.');
     }
   },
 
@@ -227,74 +229,3 @@ export const authService = {
   },
 };
 
-// Initialize Google Sign-In
-function initializeGoogleSignIn(clientId, resolve, reject) {
-  google.accounts.id.initialize({
-    client_id: clientId,
-    callback: async (response) => {
-      try {
-        // Decode the credential JWT
-        const credential = response.credential;
-        
-        // Decode JWT token (simple decode, not verification - backend will verify)
-        const payload = JSON.parse(atob(credential.split('.')[1]));
-        
-        // Send to backend
-        const apiResponse = await apiRequest('/auth/google', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            name: payload.name,
-            email: payload.email,
-            googleId: payload.sub,
-            photoURL: payload.picture
-          }),
-        });
-
-        if (apiResponse.status === 'success' && apiResponse.data) {
-          // Store token and user data
-          localStorage.setItem(STORAGE_KEY, apiResponse.data.token);
-          localStorage.setItem(USER_KEY, JSON.stringify(apiResponse.data.user));
-          
-          resolve({
-            user: apiResponse.data.user,
-            token: apiResponse.data.token
-          });
-        } else {
-          reject(new Error(apiResponse.message || 'Google authentication failed'));
-        }
-      } catch (error) {
-        reject(new Error(error.message || 'Google sign-in failed'));
-      }
-    },
-  });
-
-  // Use One Tap flow - if not shown, user can click button
-  google.accounts.id.prompt((notification) => {
-    // One Tap may not always show, that's okay - button will work
-    if (notification.isNotDisplayed() || notification.isSkippedMoment() || notification.isDismissedMoment()) {
-      // One Tap not shown - this is fine, the button will handle it
-      console.log('One Tap not displayed, button will be used');
-    }
-  });
-}
-
-// Alternative: Sign in with Google button
-export const renderGoogleSignInButton = (elementId) => {
-  if (typeof google === 'undefined') {
-    console.error('Google Identity Services not loaded');
-    return;
-  }
-
-  google.accounts.id.renderButton(
-    document.getElementById(elementId),
-    {
-      theme: 'outline',
-      size: 'large',
-      text: 'signin_with',
-      width: '100%'
-    }
-  );
-};

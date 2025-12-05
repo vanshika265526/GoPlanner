@@ -141,6 +141,68 @@ export const sendPasswordResetEmail = async (email, name, token) => {
 };
 
 /**
+ * Send OTP email for email verification
+ */
+export const sendOTPEmail = async (email, name, otp) => {
+  try {
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: `"GoPlanner" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: 'Verify Your Email - GoPlanner',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Verify Your Email</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #137fec 0%, #0f6bc6 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+            <h1 style="color: white; margin: 0;">GoPlanner</h1>
+          </div>
+          <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px;">
+            <h2 style="color: #137fec; margin-top: 0;">Welcome to GoPlanner, ${name}!</h2>
+            <p>Thank you for signing up. Please use the OTP code below to verify your email address and complete your registration:</p>
+            <div style="text-align: center; margin: 30px 0;">
+              <div style="display: inline-block; background: #137fec; color: white; padding: 20px 40px; border-radius: 10px; font-size: 32px; font-weight: bold; letter-spacing: 8px;">
+                ${otp}
+              </div>
+            </div>
+            <p style="font-size: 14px; color: #666;">This OTP will expire in 10 minutes.</p>
+            <p style="font-size: 14px; color: #666;">If you didn't create this account, please ignore this email.</p>
+          </div>
+          <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
+            <p>© ${new Date().getFullYear()} GoPlanner. All rights reserved.</p>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `
+        Welcome to GoPlanner, ${name}!
+        
+        Thank you for signing up. Please use the OTP code below to verify your email address:
+        
+        ${otp}
+        
+        This OTP will expire in 10 minutes.
+        
+        If you didn't create this account, please ignore this email.
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log('OTP email sent:', info.messageId);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('Error sending OTP email:', error);
+    throw new Error('Failed to send OTP email');
+  }
+};
+
+/**
  * Send contact form email
  */
 export const sendContactEmail = async ({ name, email, subject, message, issueType }) => {

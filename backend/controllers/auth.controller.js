@@ -1,75 +1,81 @@
 import User from '../models/User.model.js';
 import { generateToken } from '../config/jwt.js';
 import crypto from 'crypto';
-import { sendVerificationEmail } from '../services/emailService.js';
+import { sendOTPEmail } from '../services/emailService.js';
 
-// Register new user - account will only be created after email verification
+// Register new user - send OTP for verification
 export const register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
-    // Check if user already exists (verified or unverified)
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      if (existingUser.emailVerified) {
-        return res.status(400).json({
-          status: 'error',
-          message: 'User with this email already exists'
-        });
-      } else {
-        // User exists but not verified - update verification token and resend email
-        const emailVerificationToken = crypto.randomBytes(32).toString('hex');
-        existingUser.emailVerificationToken = emailVerificationToken;
-        existingUser.name = name; // Update name in case it changed
-        existingUser.password = password; // Update password (will be hashed by pre-save hook)
-        await existingUser.save();
-
-        // Send verification email
-        try {
-          await sendVerificationEmail(existingUser.email, existingUser.name, emailVerificationToken);
-        } catch (emailError) {
-          console.error('Failed to send verification email:', emailError);
-        }
-
-        return res.status(200).json({
-          status: 'success',
-          message: 'Verification email sent. Please check your email to verify your account.',
-          data: {
-            email: existingUser.email
-          }
-        });
-      }
+    // Check if user already exists and is verified
+    const existingUser = await User.findOne({ email }).select('+otp +otpExpire');
+    if (existingUser && existingUser.emailVerified) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'User with this email already exists'
+      });
     }
 
-    // Generate email verification token
-    const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpire = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    // Create unverified user (account not fully created until verification)
+    if (existingUser && !existingUser.emailVerified) {
+      // User exists but not verified - update OTP and resend
+      existingUser.otp = otp;
+      existingUser.otpExpire = otpExpire;
+      existingUser.name = name;
+      existingUser.password = password; // Update password (will be hashed by pre-save hook)
+      await existingUser.save();
+
+      // Send OTP email
+      try {
+        await sendOTPEmail(existingUser.email, existingUser.name, otp);
+      } catch (emailError) {
+        console.error('Failed to send OTP email:', emailError);
+        return res.status(500).json({
+          status: 'error',
+          message: 'Failed to send OTP email. Please try again.'
+        });
+      }
+
+      return res.status(200).json({
+        status: 'success',
+        message: 'OTP sent to your email. Please check your inbox.',
+        data: {
+          email: existingUser.email
+        }
+      });
+    }
+
+    // Create unverified user (account not fully created until OTP verification)
     const user = await User.create({
       name,
       email,
       password,
-      emailVerificationToken,
+      otp: otp,
+      otpExpire: otpExpire,
       emailVerified: false
     });
 
-    // Send verification email
+    // Send OTP email
     try {
-      await sendVerificationEmail(user.email, user.name, emailVerificationToken);
+      await sendOTPEmail(user.email, user.name, otp);
     } catch (emailError) {
-      console.error('Failed to send verification email:', emailError);
+      console.error('Failed to send OTP email:', emailError);
       // Delete the unverified user if email fails
       await User.findByIdAndDelete(user._id);
       return res.status(500).json({
         status: 'error',
-        message: 'Failed to send verification email. Please try again.'
+        message: 'Failed to send OTP email. Please try again.'
       });
     }
 
-    // Don't send token - user must verify email first
+    // Don't send token - user must verify OTP first
     res.status(201).json({
       status: 'success',
-      message: 'Please check your email to verify your account. Your account will be created after verification.',
+      message: 'OTP sent to your email. Please check your inbox.',
       data: {
         email: user.email
       }
@@ -78,6 +84,81 @@ export const register = async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: error.message || 'Registration failed'
+    });
+  }
+};
+
+// Verify OTP and create account - user is logged in
+export const verifyOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Email and OTP are required'
+      });
+    }
+
+    // Find user with email and OTP
+    const user = await User.findOne({ email }).select('+otp +otpExpire');
+    
+    if (!user) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid email or OTP'
+      });
+    }
+
+    if (user.emailVerified) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Email already verified. Please login.'
+      });
+    }
+
+    // Check if OTP matches
+    if (user.otp !== otp) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid OTP'
+      });
+    }
+
+    // Check if OTP is expired
+    if (user.otpExpire && user.otpExpire < new Date()) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'OTP has expired. Please request a new OTP.'
+      });
+    }
+
+    // Verify the account
+    user.emailVerified = true;
+    user.otp = undefined;
+    user.otpExpire = undefined;
+    await user.save();
+
+    // Generate JWT token for automatic login after verification
+    const jwtToken = generateToken(user._id);
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Email verified successfully. Your account has been created.',
+      data: {
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          emailVerified: true
+        },
+        token: jwtToken
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'OTP verification failed'
     });
   }
 };
@@ -100,7 +181,7 @@ export const login = async (req, res) => {
     if (!user.emailVerified) {
       return res.status(403).json({
         status: 'error',
-        message: 'Please verify your email before logging in. Check your inbox for the verification link.'
+        message: 'Please verify your email before logging in. Check your inbox for the OTP code.'
       });
     }
 
@@ -137,150 +218,62 @@ export const login = async (req, res) => {
   }
 };
 
-// Google OAuth - Create or login user
-export const googleAuth = async (req, res) => {
-  try {
-    const { name, email, googleId, photoURL } = req.body;
 
-    if (!email || !googleId) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Google authentication data is required'
-      });
-    }
-
-    // Check if user exists
-    let user = await User.findOne({ email });
-
-    if (user) {
-      // User exists, update Google ID if not set
-      if (!user.googleId) {
-        user.googleId = googleId;
-        if (photoURL) user.profilePicture = photoURL;
-        await user.save();
-      }
-    } else {
-      // Create new user
-      user = await User.create({
-        name: name || email.split('@')[0],
-        email,
-        googleId,
-        emailVerified: true, // Google emails are verified
-        profilePicture: photoURL || null,
-        password: crypto.randomBytes(32).toString('hex') // Random password for Google users
-      });
-    }
-
-    // Generate JWT token
-    const token = generateToken(user._id);
-
-    res.status(200).json({
-      status: 'success',
-      message: 'Google authentication successful',
-      data: {
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          emailVerified: user.emailVerified,
-          profilePicture: user.profilePicture
-        },
-        token
-      }
-    });
-  } catch (error) {
-    res.status(500).json({
-      status: 'error',
-      message: error.message || 'Google authentication failed'
-    });
-  }
-};
-
-// Verify email - account is fully created and activated here
-export const verifyEmail = async (req, res) => {
-  try {
-    const { token: verificationToken } = req.params;
-
-    const user = await User.findOne({ emailVerificationToken: verificationToken }).select('+emailVerificationToken');
-    if (!user) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Invalid or expired verification token'
-      });
-    }
-
-    // Activate the account by marking email as verified
-    user.emailVerified = true;
-    user.emailVerificationToken = undefined;
-    await user.save();
-
-    // Generate JWT token for automatic login after verification
-    const jwtToken = generateToken(user._id);
-
-    res.status(200).json({
-      status: 'success',
-      message: 'Email verified successfully. Your account has been created.',
-      data: {
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          emailVerified: true
-        },
-        token: jwtToken
-      }
-    });
-  } catch (error) {
-    res.status(500).json({
-      status: 'error',
-      message: error.message || 'Email verification failed'
-    });
-  }
-};
-
-// Resend verification email
+// Resend OTP
 export const resendVerification = async (req, res) => {
   try {
     const { email } = req.body;
 
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({
+    if (!email) {
+      return res.status(400).json({
         status: 'error',
-        message: 'User not found'
+        message: 'Email is required'
+      });
+    }
+
+    const user = await User.findOne({ email }).select('+otp +otpExpire');
+    
+    if (!user) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'User not found. Please sign up again.'
       });
     }
 
     if (user.emailVerified) {
       return res.status(400).json({
         status: 'error',
-        message: 'Email already verified'
+        message: 'Email already verified. Please login.'
       });
     }
 
-    // Generate new verification token
-    const emailVerificationToken = crypto.randomBytes(32).toString('hex');
-    user.emailVerificationToken = emailVerificationToken;
+    // Generate new OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpire = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    user.otp = otp;
+    user.otpExpire = otpExpire;
     await user.save();
 
-    // Send verification email
+    // Send OTP email
     try {
-      await sendVerificationEmail(user.email, user.name, emailVerificationToken);
-      res.status(200).json({
-        status: 'success',
-        message: 'Verification email sent. Please check your inbox.'
-      });
+      await sendOTPEmail(user.email, user.name, otp);
     } catch (emailError) {
-      console.error('Failed to send verification email:', emailError);
-      res.status(500).json({
+      console.error('Failed to send OTP email:', emailError);
+      return res.status(500).json({
         status: 'error',
-        message: 'Failed to send verification email. Please try again later.'
+        message: 'Failed to send OTP email. Please try again.'
       });
     }
+
+    res.status(200).json({
+      status: 'success',
+      message: 'OTP sent to your email. Please check your inbox.'
+    });
   } catch (error) {
     res.status(500).json({
       status: 'error',
-      message: error.message || 'Failed to resend verification email'
+      message: error.message || 'Failed to resend OTP'
     });
   }
 };

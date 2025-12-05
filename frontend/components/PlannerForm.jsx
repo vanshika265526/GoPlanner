@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -8,6 +8,7 @@ import { ThemeToggle } from './ThemeToggle';
 import { PageHeader } from './PageHeader';
 import { generateRealItinerary } from '../services/placesService';
 import { ItineraryMap } from './ItineraryMap';
+import { searchPlaces } from '../services/openRouteService';
 
 // Beautiful travel destination images from different cities and countries
 const TRAVEL_BACKGROUNDS = [
@@ -39,7 +40,14 @@ const POPULAR_DESTINATIONS = [
   'Oslo, Norway', 'Reykjavik, Iceland', 'Edinburgh, Scotland', 'Dublin, Ireland',
 ];
 
-const BUDGET_OPTIONS = ['Low', 'Mid', 'High'];
+const BUDGET_OPTIONS = [
+  { value: 'Under $500', label: 'Under $500 (Budget-friendly)' },
+  { value: '$500 - $1,000', label: '$500 - $1,000 (Economy)' },
+  { value: '$1,000 - $2,500', label: '$1,000 - $2,500 (Moderate)' },
+  { value: '$2,500 - $5,000', label: '$2,500 - $5,000 (Comfortable)' },
+  { value: '$5,000 - $10,000', label: '$5,000 - $10,000 (Luxury)' },
+  { value: 'Above $10,000', label: 'Above $10,000 (Premium)' }
+];
 const TRAVEL_INTERESTS = [
   'Nature', 'Beaches', 'Temples', 'Shopping', 'Adventure', 
   'History', 'Food', 'Art', 'Nightlife', 'Relaxation'
@@ -224,7 +232,7 @@ export const PlannerForm = ({ onSubmit, onCancel, initialData = null, onBack, on
     destination: initialData?.destination || '',
     startDate: initialData?.startDate || '',
     endDate: initialData?.endDate || '',
-    budget: initialData?.budget || 'Mid',
+    budget: initialData?.budget || '$1,000 - $2,500',
     interests: initialData?.interests || [],
   });
   const [itinerary, setItinerary] = useState(null);
@@ -232,6 +240,8 @@ export const PlannerForm = ({ onSubmit, onCancel, initialData = null, onBack, on
   const [currentBackgroundIndex, setCurrentBackgroundIndex] = useState(0);
   const [destinationSuggestions, setDestinationSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
+  const searchTimeoutRef = useRef(null);
   const [isLoading, setIsLoading] = useState(false);
   const [itineraryCoordinates, setItineraryCoordinates] = useState(null);
   const [selectedDay, setSelectedDay] = useState(null);
@@ -252,13 +262,22 @@ export const PlannerForm = ({ onSubmit, onCancel, initialData = null, onBack, on
         destination: initialData.destination || '',
         startDate: initialData.startDate || '',
         endDate: initialData.endDate || '',
-        budget: initialData.budget || 'Mid',
+        budget: initialData.budget || '$1,000 - $2,500',
         interests: initialData.interests || [],
       });
       // If we have initial data, we can auto-advance to step 2 if itinerary exists
       // But for now, let's keep it at step 1 so user can review and regenerate
     }
   }, [initialData]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const toggleInterest = (interest) => {
     setFormData(prev => ({
@@ -269,23 +288,92 @@ export const PlannerForm = ({ onSubmit, onCancel, initialData = null, onBack, on
     }));
   };
 
-  const handleDestinationChange = (value) => {
+  const handleDestinationChange = async (value) => {
     setFormData(prev => ({ ...prev, destination: value }));
     
-    if (value.length > 0) {
-      const filtered = POPULAR_DESTINATIONS.filter(dest =>
-        dest.toLowerCase().includes(value.toLowerCase())
-      ).slice(0, 8); // Show max 8 suggestions
-      setDestinationSuggestions(filtered);
-      setShowSuggestions(filtered.length > 0);
-    } else {
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    if (value.length < 2) {
       setDestinationSuggestions([]);
       setShowSuggestions(false);
+      return;
     }
+
+    // Debounce API calls (wait 300ms after user stops typing)
+    searchTimeoutRef.current = setTimeout(async () => {
+      setIsLoadingPlaces(true);
+      try {
+        // Try OpenRouteService API first
+        const places = await searchPlaces(value, 8);
+        
+        if (places.length > 0) {
+          setDestinationSuggestions(places);
+          setShowSuggestions(true);
+        } else {
+          // Fallback to local suggestions if API returns no results
+          const filtered = POPULAR_DESTINATIONS.filter(dest =>
+            dest.toLowerCase().includes(value.toLowerCase())
+          ).slice(0, 8);
+          
+          // Convert to same format as API results
+          const fallbackSuggestions = filtered.map(dest => ({
+            id: `fallback-${dest}`,
+            name: dest,
+            fullName: dest,
+            coordinates: null,
+            country: '',
+            locality: '',
+            region: '',
+            type: 'place'
+          }));
+          
+          setDestinationSuggestions(fallbackSuggestions);
+          setShowSuggestions(fallbackSuggestions.length > 0);
+        }
+      } catch (error) {
+        console.error('Error fetching places:', error);
+        // Fallback to local suggestions on error
+        const filtered = POPULAR_DESTINATIONS.filter(dest =>
+          dest.toLowerCase().includes(value.toLowerCase())
+        ).slice(0, 8);
+        
+        const fallbackSuggestions = filtered.map(dest => ({
+          id: `fallback-${dest}`,
+          name: dest,
+          fullName: dest,
+          coordinates: null,
+          country: '',
+          locality: '',
+          region: '',
+          type: 'place'
+        }));
+        
+        setDestinationSuggestions(fallbackSuggestions);
+        setShowSuggestions(fallbackSuggestions.length > 0);
+      } finally {
+        setIsLoadingPlaces(false);
+      }
+    }, 300);
   };
 
-  const handleDestinationSelect = (destination) => {
-    setFormData(prev => ({ ...prev, destination }));
+  const handleDestinationSelect = (place) => {
+    // Handle both string (fallback) and object (API result) formats
+    const destinationName = typeof place === 'string' ? place : place.fullName || place.name;
+    const coordinates = typeof place === 'object' && place.coordinates ? place.coordinates : null;
+    
+    setFormData(prev => ({ 
+      ...prev, 
+      destination: destinationName 
+    }));
+    
+    // Store coordinates if available
+    if (coordinates) {
+      setItineraryCoordinates(coordinates);
+    }
+    
     setShowSuggestions(false);
     setDestinationSuggestions([]);
   };
@@ -487,7 +575,7 @@ export const PlannerForm = ({ onSubmit, onCancel, initialData = null, onBack, on
       <div
         ref={setNodeRef}
         style={mergedStyle}
-        className={`group relative bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700 hover:border-primary/50 dark:hover:border-primary/50 transition-all duration-300 hover:shadow-lg cursor-grab active:cursor-grabbing ${
+        className={`group relative bg-white dark:bg-[#020617] rounded-xl p-4 border border-slate-200 dark:border-slate-700 hover:border-primary/50 dark:hover:border-primary/50 transition-all duration-300 hover:shadow-lg cursor-grab active:cursor-grabbing ${
           editingActivity === activity.id ? 'ring-2 ring-primary' : ''
         } ${isDragging ? 'z-50 shadow-2xl' : ''}`}
       >
@@ -705,22 +793,39 @@ export const PlannerForm = ({ onSubmit, onCancel, initialData = null, onBack, on
                 required
               />
                 {/* Autocomplete Dropdown */}
-                {showSuggestions && destinationSuggestions.length > 0 && (
-                  <div className="destination-dropdown absolute z-50 w-full mt-2 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/50 dark:border-white/10 shadow-xl overflow-hidden max-h-64 overflow-y-auto">
-                    {destinationSuggestions.map((dest, index) => (
-                      <button
-                        key={index}
-                        type="button"
-                        onMouseDown={(e) => {
-                          e.preventDefault(); // Prevent input blur
-                          handleDestinationSelect(dest);
-                        }}
-                        className="w-full px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors flex items-center gap-3 border-b border-slate-100 dark:border-white/5 last:border-b-0"
-                      >
-                        <span className="material-symbols-outlined text-primary text-lg">location_on</span>
-                        <span className="text-slate-900 dark:text-white font-medium">{dest}</span>
-                      </button>
-                    ))}
+                {(showSuggestions || isLoadingPlaces) && (
+                  <div className="destination-dropdown absolute z-50 w-full mt-2 bg-white dark:bg-[#020617] rounded-2xl border border-slate-200/50 dark:border-white/10 shadow-xl overflow-hidden max-h-64 overflow-y-auto">
+                    {isLoadingPlaces ? (
+                      <div className="px-4 py-6 text-center">
+                        <div className="inline-block size-6 rounded-full border-2 border-primary border-t-transparent animate-spin mb-2"></div>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">Searching places...</p>
+                      </div>
+                    ) : destinationSuggestions.length > 0 ? (
+                      destinationSuggestions.map((place) => {
+                        const displayName = typeof place === 'string' ? place : (place.fullName || place.name);
+                        const country = typeof place === 'object' ? place.country : '';
+                        
+                        return (
+                          <button
+                            key={place.id || place}
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault(); // Prevent input blur
+                              handleDestinationSelect(place);
+                            }}
+                            className="w-full px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors flex items-center gap-3 border-b border-slate-100 dark:border-white/5 last:border-b-0"
+                          >
+                            <span className="material-symbols-outlined text-primary text-lg">location_on</span>
+                            <div className="flex-1">
+                              <span className="text-slate-900 dark:text-white font-medium block">{displayName}</span>
+                              {country && (
+                                <span className="text-xs text-slate-500 dark:text-slate-400">{country}</span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })
+                    ) : null}
                   </div>
                 )}
               </div>
@@ -744,7 +849,7 @@ export const PlannerForm = ({ onSubmit, onCancel, initialData = null, onBack, on
 
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-slate-700 dark:text-white/80">
-                  Budget range
+                  Budget range (per person)
                   </label>
                   <select
                     className="block w-full rounded-2xl border border-slate-300/80 dark:border-white/10 bg-white/90 dark:bg-white/5 py-3.5 pl-4 pr-10 text-slate-900 dark:text-white shadow-sm focus:border-primary focus:ring-primary text-base"
@@ -752,7 +857,7 @@ export const PlannerForm = ({ onSubmit, onCancel, initialData = null, onBack, on
                   onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
                 >
                   {BUDGET_OPTIONS.map(opt => (
-                    <option key={opt} value={opt}>{opt}</option>
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
                   </select>
               </div>
@@ -799,7 +904,7 @@ export const PlannerForm = ({ onSubmit, onCancel, initialData = null, onBack, on
   if (step === 2) {
     if (!itinerary || itinerary.length === 0) {
       return (
-        <div className="relative min-h-screen bg-white dark:bg-slate-900 text-slate-900 dark:text-white transition-colors flex items-center justify-center">
+        <div className="relative min-h-screen bg-white dark:bg-[#020617] text-slate-900 dark:text-white transition-colors flex items-center justify-center">
           <div className="text-center space-y-4">
             <p className="text-slate-600 dark:text-slate-400">No itinerary data available. Please go back and generate an itinerary.</p>
             <Button onClick={() => setStep(1)}>Back to Form</Button>
@@ -811,7 +916,7 @@ export const PlannerForm = ({ onSubmit, onCancel, initialData = null, onBack, on
     const currentDay = selectedDay || itinerary?.[0];
     
     return (
-      <div className="relative min-h-screen bg-white dark:bg-slate-900 text-slate-900 dark:text-white transition-colors">
+      <div className="relative min-h-screen bg-white dark:bg-[#020617] text-slate-900 dark:text-white transition-colors">
         <PageHeader
           onBack={() => setStep(1)}
           onDashboard={onDashboard}
@@ -822,7 +927,7 @@ export const PlannerForm = ({ onSubmit, onCancel, initialData = null, onBack, on
         />
         
         {/* Additional info bar below header */}
-        <div className="sticky top-[73px] z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700">
+        <div className="sticky top-[73px] z-40 bg-white/90 dark:bg-[#020617]/90 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700">
           <div className="max-w-7xl mx-auto px-6 py-3">
             <div className="flex items-center justify-between">
               <div className="px-4 py-2 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
@@ -833,6 +938,11 @@ export const PlannerForm = ({ onSubmit, onCancel, initialData = null, onBack, on
               <Button
                 variant="secondary"
                 className="h-9 px-4 text-sm"
+                onClick={() => {
+                  // Dispatch custom event to open chatbot
+                  window.dispatchEvent(new CustomEvent('openChatBot'));
+                }}
+                icon="chat"
               >
                 Ask AI Assistant
               </Button>
@@ -919,7 +1029,7 @@ export const PlannerForm = ({ onSubmit, onCancel, initialData = null, onBack, on
         </div>
 
         {/* Footer Actions */}
-        <div className="sticky bottom-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm border-t border-slate-200 dark:border-slate-700">
+        <div className="sticky bottom-0 bg-white/95 dark:bg-[#020617]/95 backdrop-blur-sm border-t border-slate-200 dark:border-slate-700">
           <div className="max-w-7xl mx-auto px-6 py-4">
             <div className="flex items-center justify-between">
               <Button

@@ -16,7 +16,7 @@ import { AppScreen } from './types';
 import { downloadItineraryPDF } from './services/pdfService';
 
 function AppContent() {
-  const { login: authLogin, signup: authSignup, signInWithGoogle: authGoogleSignIn, isAuthenticated, logout: authLogout } = useAuth();
+  const { login: authLogin, signup: authSignup, isAuthenticated, logout: authLogout, refreshAuth, user: authUser } = useAuth();
   const [currentScreen, setCurrentScreen] = useState(AppScreen.LANDING);
   const [itinerary, setItinerary] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -48,9 +48,21 @@ function AppContent() {
           if (result.success && result.user && result.token) {
             // Account created and user logged in - update auth context
             setVerificationStatus('success');
-            // Refresh page to update auth state
+            // Update auth context by calling verifyToken
+            try {
+              const verifiedUser = await authService.verifyToken();
+              if (verifiedUser) {
+                // Refresh auth context
+                await refreshAuth();
+              }
+            } catch (err) {
+              console.error('Failed to verify token after email verification:', err);
+            }
+            // Redirect to home after a short delay
             setTimeout(() => {
-              window.location.href = '/';
+              setCurrentScreen(AppScreen.LANDING);
+              setVerificationStatus(null);
+              setVerificationToken(null);
             }, 2000);
           } else {
             setVerificationStatus('error');
@@ -86,6 +98,23 @@ function AppContent() {
   const handleNavigateToDashboard = () => {
     setNavigationHistory(prev => [...prev, AppScreen.DASHBOARD]);
     setCurrentScreen(AppScreen.DASHBOARD);
+  };
+
+  const handleNavigateToSavedPlans = () => {
+    console.log('Navigating to Saved Plans, current screen:', currentScreen);
+    setNavigationHistory(prev => [...prev, AppScreen.SAVED_PLANS]);
+    setCurrentScreen(AppScreen.SAVED_PLANS);
+    console.log('Set screen to:', AppScreen.SAVED_PLANS);
+  };
+
+  const handleNavigateToAboutUs = () => {
+    setNavigationHistory(prev => [...prev, AppScreen.ABOUT_US]);
+    setCurrentScreen(AppScreen.ABOUT_US);
+  };
+
+  const handleNavigateToContactUs = () => {
+    setNavigationHistory(prev => [...prev, AppScreen.CONTACT_US]);
+    setCurrentScreen(AppScreen.CONTACT_US);
   };
 
   const handleGoBack = () => {
@@ -194,47 +223,63 @@ function AppContent() {
     }
   };
 
-  const handleSignup = async (data) => {
+  const handleSignup = async (data, onSuccess) => {
     setIsLoading(true);
     setError(null);
     try {
       const result = await authSignup(data.email, data.password, data.name);
       if (result.success) {
-        // Show success message and redirect to home immediately
-        // Account will only be created after email verification
-        setError('Verification email sent! Please check your inbox and verify your email to create your account.');
-        // Redirect to home page immediately
-        setTimeout(() => {
-          setCurrentScreen(AppScreen.LANDING);
-          setError(null);
-        }, 2000);
+        // Show success message and trigger callback to show OTP screen
+        setError('OTP sent to your email! Please check your inbox.');
+        setTimeout(() => setError(null), 5000);
+        if (onSuccess) {
+          onSuccess();
+        }
       } else {
         setError(result.error || 'Signup failed. Please try again.');
       }
     } catch (err) {
-      setError('An error occurred during signup. Please try again.');
+      setError(err.message || 'An error occurred during signup. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleGoogleSignIn = async () => {
+  const handleVerifyOTP = async (email, otp, onSuccess, onError) => {
     setIsLoading(true);
     setError(null);
     try {
-      const result = await authGoogleSignIn();
+      const { authService } = await import('./services/authService');
+      const result = await authService.verifyOTP(email, otp);
+      
       if (result.success) {
-        // Navigate to landing page after successful Google sign-in
+        // Account created and user logged in - update auth context
+        await refreshAuth();
+        // Navigate to landing page after successful OTP verification
         setCurrentScreen(AppScreen.LANDING);
+        setError('Account created successfully! Welcome to GoPlanner.');
+        setTimeout(() => setError(null), 5000);
+        if (onSuccess) {
+          onSuccess();
+        }
       } else {
-        setError(result.error || 'Google sign-in failed. Please try again.');
+        const errorMsg = result.error || 'Invalid OTP. Please try again.';
+        setError(errorMsg);
+        if (onError) {
+          onError(errorMsg);
+        }
       }
     } catch (err) {
-      setError('An error occurred during Google sign-in. Please try again.');
+      const errorMsg = err.message || 'OTP verification failed. Please try again.';
+      setError(errorMsg);
+      if (onError) {
+        onError(errorMsg);
+      }
     } finally {
       setIsLoading(false);
     }
   };
+
 
   if (currentScreen === AppScreen.LOADING) {
     return (
@@ -261,7 +306,7 @@ function AppContent() {
       destination: itineraryData.destination || '',
       startDate: itineraryData.startDate || (itineraryData.days?.[0]?.activities?.[0]?.date || ''),
       endDate: itineraryData.endDate || (itineraryData.days?.[itineraryData.days?.length - 1]?.activities?.[0]?.date || ''),
-      budget: itineraryData.budget || 'Mid',
+      budget: itineraryData.budget || '$1,000 - $2,500',
       interests: itineraryData.interests || [],
     };
     
@@ -320,29 +365,77 @@ function AppContent() {
       setIsLoading(true);
       setError(null);
 
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      // Check if user is authenticated
       const token = localStorage.getItem('goplanner_token');
+      if (!token) {
+        setError('Please sign in to save your plan.');
+        setTimeout(() => {
+          setCurrentScreen(AppScreen.AUTH);
+        }, 2000);
+        return;
+      }
+
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+      // Get days from itineraryData (could be days or itinerary property)
+      const days = itineraryData.days || itineraryData.itinerary || [];
+      
+      // Calculate start and end dates from days if not provided
+      let startDate = itineraryData.startDate;
+      let endDate = itineraryData.endDate;
+      
+      if (!startDate && days.length > 0) {
+        // Try to get date from first day's activities or day itself
+        const firstDay = days[0];
+        startDate = firstDay.date || firstDay.activities?.[0]?.date || new Date().toISOString();
+      }
+      
+      if (!endDate && days.length > 0) {
+        const lastDay = days[days.length - 1];
+        endDate = lastDay.date || lastDay.activities?.[0]?.date || new Date().toISOString();
+      }
+
+      // Validate and normalize budget value
+      const validBudgetValues = [
+        'Under $500', 
+        '$500 - $1,000', 
+        '$1,000 - $2,500', 
+        '$2,500 - $5,000', 
+        '$5,000 - $10,000', 
+        'Above $10,000',
+        'Low', 
+        'Mid', 
+        'High'
+      ];
+      
+      let budgetValue = itineraryData.budget ? itineraryData.budget.trim() : '$1,000 - $2,500';
+      
+      // Ensure budget is valid, otherwise use default
+      if (!validBudgetValues.includes(budgetValue)) {
+        console.warn('Invalid budget value:', budgetValue, 'Using default');
+        budgetValue = '$1,000 - $2,500';
+      }
 
       // Convert itinerary format to trip format for backend
       const tripData = {
         destination: itineraryData.destination || '',
-        startDate: itineraryData.startDate || (itineraryData.days?.[0]?.date || new Date().toISOString()),
-        endDate: itineraryData.endDate || (itineraryData.days?.[itineraryData.days?.length - 1]?.date || new Date().toISOString()),
-        budget: itineraryData.budget || 'Mid',
+        startDate: startDate || new Date().toISOString(),
+        endDate: endDate || new Date().toISOString(),
+        budget: budgetValue,
         interests: itineraryData.interests || [],
-        itinerary: (itineraryData.itinerary || itineraryData.days || []).map(day => ({
-          dayNumber: day.dayNumber || 1,
-          date: day.date || new Date().toISOString(),
-          activities: (day.activities || []).map(act => ({
-            id: act.id || `${Date.now()}-${Math.random()}`,
+        itinerary: days.map((day, index) => ({
+          dayNumber: day.dayNumber || (index + 1),
+          date: day.date || startDate || new Date().toISOString(),
+          activities: (day.activities || []).map((act, actIndex) => ({
+            id: act.id || `${Date.now()}-${Math.random()}-${actIndex}`,
             time: act.time || '',
             activity: act.activity || act.name || '',
             type: act.type || 'sightseeing',
-            location: act.location || '',
+            location: act.location || itineraryData.destination || '',
             notes: act.notes || act.description || '',
             coordinates: act.coordinates || null,
             rating: act.rating || null,
-            order: act.order || 1,
+            order: act.order || (actIndex + 1),
           })),
           weather: day.weather || null,
         })),
@@ -350,25 +443,31 @@ function AppContent() {
         status: 'planned',
       };
 
+      console.log('Saving trip data:', tripData);
+
       const response = await fetch(`${API_BASE_URL}/trips`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token && { Authorization: `Bearer ${token}` }),
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(tripData),
       });
 
       const result = await response.json();
+      console.log('Save plan response:', result);
 
       if (result.status === 'success') {
         alert('Plan saved successfully!');
+        // Dispatch event to refresh saved plans if on that screen
+        window.dispatchEvent(new CustomEvent('refreshSavedPlans'));
       } else {
         throw new Error(result.message || 'Failed to save plan');
       }
     } catch (error) {
       console.error('Save plan error:', error);
       setError(error.message || 'Failed to save plan. Please try again.');
+      alert('Failed to save plan: ' + (error.message || 'Please try again.'));
     } finally {
       setIsLoading(false);
     }
@@ -434,7 +533,7 @@ function AppContent() {
         onBack={handleGoBack}
         onLogin={handleLogin}
         onSignup={handleSignup}
-        onGoogleSignIn={handleGoogleSignIn}
+        onVerifyOTP={handleVerifyOTP}
         isLoading={isLoading}
         error={error}
         onDashboard={handleNavigateToDashboard}
@@ -443,7 +542,6 @@ function AppContent() {
   }
 
   if (currentScreen === AppScreen.DASHBOARD) {
-    console.log('Rendering UserDashboard, currentScreen:', currentScreen);
     return (
       <UserDashboard
         onBack={handleGoBack}
@@ -488,23 +586,6 @@ function AppContent() {
       </div>
     );
   }
-
-  const handleNavigateToSavedPlans = () => {
-    console.log('Navigating to Saved Plans, current screen:', currentScreen);
-    setNavigationHistory(prev => [...prev, AppScreen.SAVED_PLANS]);
-    setCurrentScreen(AppScreen.SAVED_PLANS);
-    console.log('Set screen to:', AppScreen.SAVED_PLANS);
-  };
-
-  const handleNavigateToAboutUs = () => {
-    setNavigationHistory(prev => [...prev, AppScreen.ABOUT_US]);
-    setCurrentScreen(AppScreen.ABOUT_US);
-  };
-
-  const handleNavigateToContactUs = () => {
-    setNavigationHistory(prev => [...prev, AppScreen.CONTACT_US]);
-    setCurrentScreen(AppScreen.CONTACT_US);
-  };
 
   if (currentScreen === AppScreen.CONTACT_US) {
     return (

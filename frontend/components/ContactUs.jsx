@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { PageHeader } from './PageHeader';
 import { Button } from './Button';
+import { AppFooter } from './AppFooter';
 
 export const ContactUs = ({ onBack, onDashboard, onHome }) => {
   const [formData, setFormData] = useState({
@@ -63,7 +64,7 @@ export const ContactUs = ({ onBack, onDashboard, onHome }) => {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background-light text-slate-900 dark:bg-[#020617] dark:text-white transition-colors">
+    <div className="relative min-h-screen flex flex-col overflow-hidden bg-background-light text-slate-900 dark:bg-[#020617] dark:text-white transition-colors">
       <div className="backdrop-grid" aria-hidden />
       <div className="aurora-layer" aria-hidden />
 
@@ -74,7 +75,7 @@ export const ContactUs = ({ onBack, onDashboard, onHome }) => {
         subtitle="We'd love to hear from you"
       />
 
-      <div className="relative z-10 max-w-6xl mx-auto px-6 py-12">
+      <div className="relative z-10 flex-1 max-w-6xl mx-auto px-6 py-12">
         <div className="grid gap-12 lg:grid-cols-[1fr_1fr]">
           {/* Contact Information */}
           <div className="space-y-8">
@@ -208,15 +209,15 @@ export const ContactUs = ({ onBack, onDashboard, onHome }) => {
                   value={formData.issueType}
                   onChange={handleChange}
                   required
-                  className="w-full px-4 py-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-white/10 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-slate-900 dark:text-white transition-colors"
+                  className="w-full px-4 py-3 rounded-2xl bg-white dark:bg-[#020617] border border-slate-200/80 dark:border-white/10 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-slate-900 dark:text-white transition-colors"
                   style={{ colorScheme: 'dark' }}
                 >
-                  <option value="general" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">General Inquiry</option>
-                  <option value="support" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">Technical Support</option>
-                  <option value="bug" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">Bug Report</option>
-                  <option value="feature" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">Feature Request</option>
-                  <option value="feedback" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">Feedback</option>
-                  <option value="other" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">Other</option>
+                  <option value="general" className="bg-white dark:bg-[#020617] text-slate-900 dark:text-white">General Inquiry</option>
+                  <option value="support" className="bg-white dark:bg-[#020617] text-slate-900 dark:text-white">Technical Support</option>
+                  <option value="bug" className="bg-white dark:bg-[#020617] text-slate-900 dark:text-white">Bug Report</option>
+                  <option value="feature" className="bg-white dark:bg-[#020617] text-slate-900 dark:text-white">Feature Request</option>
+                  <option value="feedback" className="bg-white dark:bg-[#020617] text-slate-900 dark:text-white">Feedback</option>
+                  <option value="other" className="bg-white dark:bg-[#020617] text-slate-900 dark:text-white">Other</option>
                 </select>
               </div>
 
@@ -283,6 +284,8 @@ export const ContactUs = ({ onBack, onDashboard, onHome }) => {
           </div>
         )}
       </div>
+      
+      <AppFooter />
     </div>
   );
 };

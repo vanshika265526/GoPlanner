@@ -35,6 +35,14 @@ html.dark body {
   min-height: 100vh;
 }
 
+/* Override min-height for SamplePlanPage to prevent extra blank space */
+body.sample-plan-page,
+html.sample-plan-page,
+#root.sample-plan-page {
+  min-height: auto !important;
+  height: auto !important;
+}
+
 .backdrop-grid {
   position: absolute;
   inset: 0;

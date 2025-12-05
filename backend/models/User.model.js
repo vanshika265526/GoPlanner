@@ -34,6 +34,18 @@ const userSchema = new mongoose.Schema({
     type: String,
     select: false
   },
+  emailVerificationExpire: {
+    type: Date,
+    select: false
+  },
+  otp: {
+    type: String,
+    select: false
+  },
+  otpExpire: {
+    type: Date,
+    select: false
+  },
   resetPasswordToken: {
     type: String,
     select: false
@@ -79,6 +91,39 @@ userSchema.pre('save', async function(next) {
 userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
+
+// Cascade delete: Delete all trips when user is deleted
+// Note: This is a safety measure. The deleteAccount controller explicitly deletes trips first.
+userSchema.pre('findOneAndDelete', async function(next) {
+  try {
+    const user = await this.model.findOne(this.getQuery());
+    if (user) {
+      // Use require for dynamic import in middleware
+      const TripModule = await import('./Trip.model.js');
+      const Trip = TripModule.default;
+      await Trip.deleteMany({ user: user._id });
+    }
+    next();
+  } catch (error) {
+    // If Trip model is not available, continue (trips will be deleted explicitly in controller)
+    next();
+  }
+});
+
+userSchema.pre('findByIdAndDelete', async function(next) {
+  try {
+    const userId = this.getQuery()._id;
+    if (userId) {
+      const TripModule = await import('./Trip.model.js');
+      const Trip = TripModule.default;
+      await Trip.deleteMany({ user: userId });
+    }
+    next();
+  } catch (error) {
+    // If Trip model is not available, continue (trips will be deleted explicitly in controller)
+    next();
+  }
+});
 
 const User = mongoose.model('User', userSchema);
 

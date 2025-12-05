@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './Button';
 import { PageHeader } from './PageHeader';
+import { AppFooter } from './AppFooter';
 
 export const SavedPlans = ({ onBack, onDashboard, onViewPlan, onEditPlan }) => {
   const { isAuthenticated } = useAuth();
@@ -64,6 +65,20 @@ export const SavedPlans = ({ onBack, onDashboard, onViewPlan, onEditPlan }) => {
     }
   }, [isAuthenticated, fetchSavedPlans]);
 
+  // Listen for refresh event
+  useEffect(() => {
+    const handleRefresh = () => {
+      if (isAuthenticated) {
+        fetchSavedPlans();
+      }
+    };
+
+    window.addEventListener('refreshSavedPlans', handleRefresh);
+    return () => {
+      window.removeEventListener('refreshSavedPlans', handleRefresh);
+    };
+  }, [isAuthenticated, fetchSavedPlans]);
+
   // Debug: Log when component renders
   console.log('SavedPlans render - isLoading:', isLoading, 'error:', error, 'trips:', trips.length);
 
@@ -101,23 +116,24 @@ export const SavedPlans = ({ onBack, onDashboard, onViewPlan, onEditPlan }) => {
 
   if (!isAuthenticated) {
     return (
-      <div className="relative min-h-screen overflow-hidden bg-background-light text-slate-900 dark:bg-[#020617] dark:text-white transition-colors">
+      <div className="relative min-h-screen flex flex-col overflow-hidden bg-background-light text-slate-900 dark:bg-slate-900 dark:text-white transition-colors">
         <div className="backdrop-grid" aria-hidden />
         <div className="aurora-layer" aria-hidden />
         <PageHeader onBack={onBack} onDashboard={onDashboard} title="Saved Plans" />
-        <div className="relative z-10 max-w-4xl mx-auto px-6 py-12 text-center">
+        <div className="relative z-10 flex-1 max-w-4xl mx-auto px-6 py-12 text-center">
           <div className="glass-panel rounded-[40px] p-12 space-y-6">
             <span className="material-symbols-outlined text-6xl text-slate-400">lock</span>
             <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Authentication Required</h2>
             <p className="text-slate-600 dark:text-slate-400">Please sign in to view your saved plans.</p>
           </div>
         </div>
+        <AppFooter />
       </div>
     );
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background-light text-slate-900 dark:bg-[#020617] dark:text-white transition-colors">
+    <div className="relative min-h-screen flex flex-col overflow-hidden bg-background-light text-slate-900 dark:bg-slate-900 dark:text-white transition-colors">
       <div className="backdrop-grid" aria-hidden />
       <div className="aurora-layer" aria-hidden />
 
@@ -128,7 +144,7 @@ export const SavedPlans = ({ onBack, onDashboard, onViewPlan, onEditPlan }) => {
         subtitle={trips.length > 0 ? `${trips.length} saved trip${trips.length !== 1 ? 's' : ''}` : 'Your saved trip plans'}
       />
 
-      <div className="relative z-10 max-w-6xl mx-auto px-6 py-8">
+      <div className="relative z-10 flex-1 max-w-6xl mx-auto px-6 py-8">
         {isLoading ? (
           <div className="text-center py-20">
             <div className="inline-block size-16 rounded-full border-4 border-primary border-t-transparent animate-spin mb-4"></div>
@@ -234,10 +250,12 @@ export const SavedPlans = ({ onBack, onDashboard, onViewPlan, onEditPlan }) => {
                   </div>
                 </div>
               );
-            })}
+            })}  
           </div>
         )}
       </div>
+      
+      <AppFooter />
     </div>
   );
 };

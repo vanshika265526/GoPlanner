@@ -3,9 +3,49 @@ import Trip from '../models/Trip.model.js';
 // Create new trip
 export const createTrip = async (req, res) => {
   try {
+    // Ensure user is always set from authenticated user (prevent user field manipulation)
+    const { user, budget, ...restBody } = req.body;
+    
+    // Validate and normalize budget value
+    const validBudgetValues = [
+      'Under $500', 
+      '$500 - $1,000', 
+      '$1,000 - $2,500', 
+      '$2,500 - $5,000', 
+      '$5,000 - $10,000', 
+      'Above $10,000',
+      'Low', 
+      'Mid', 
+      'High'
+    ];
+    
+    // Normalize budget - trim and check if valid
+    let normalizedBudget = budget ? budget.trim() : '$1,000 - $2,500';
+    
+    // Debug: Log the received budget value
+    console.log('Received budget:', JSON.stringify(budget));
+    console.log('Normalized budget:', JSON.stringify(normalizedBudget));
+    console.log('Is valid?', validBudgetValues.includes(normalizedBudget));
+    
+    // If budget doesn't match exactly, try to find closest match or use default
+    if (!validBudgetValues.includes(normalizedBudget)) {
+      // Try to map old values or use default
+      if (normalizedBudget.toLowerCase() === 'low') {
+        normalizedBudget = 'Under $500';
+      } else if (normalizedBudget.toLowerCase() === 'mid') {
+        normalizedBudget = '$1,000 - $2,500';
+      } else if (normalizedBudget.toLowerCase() === 'high') {
+        normalizedBudget = '$5,000 - $10,000';
+      } else {
+        // Use default if no match found
+        normalizedBudget = '$1,000 - $2,500';
+      }
+    }
+    
     const tripData = {
-      ...req.body,
-      user: req.user._id
+      ...restBody,
+      budget: normalizedBudget,
+      user: req.user._id // Always use authenticated user's ID, ignore any user field from request
     };
 
     const trip = await Trip.create(tripData);

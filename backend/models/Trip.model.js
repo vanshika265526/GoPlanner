@@ -78,8 +78,8 @@ const tripSchema = new mongoose.Schema({
   },
   budget: {
     type: String,
-    enum: ['Low', 'Mid', 'High'],
-    default: 'Mid'
+    enum: ['Under $500', '$500 - $1,000', '$1,000 - $2,500', '$2,500 - $5,000', '$5,000 - $10,000', 'Above $10,000', 'Low', 'Mid', 'High'], // Keep old values for backward compatibility
+    default: '$1,000 - $2,500'
   },
   interests: [{
     type: String
@@ -114,6 +114,47 @@ const tripSchema = new mongoose.Schema({
 tripSchema.index({ user: 1, createdAt: -1 });
 tripSchema.index({ destination: 'text' });
 tripSchema.index({ status: 1 });
+
+// Middleware to ensure user field is always set (safety check)
+tripSchema.pre('save', function(next) {
+  if (!this.user) {
+    return next(new Error('Trip must be associated with a user'));
+  }
+  
+  // Normalize budget value to ensure it matches enum
+  if (this.budget) {
+    const validBudgetValues = [
+      'Under $500', 
+      '$500 - $1,000', 
+      '$1,000 - $2,500', 
+      '$2,500 - $5,000', 
+      '$5,000 - $10,000', 
+      'Above $10,000',
+      'Low', 
+      'Mid', 
+      'High'
+    ];
+    
+    const normalizedBudget = this.budget.trim();
+    
+    if (!validBudgetValues.includes(normalizedBudget)) {
+      // Map old values or use default
+      if (normalizedBudget.toLowerCase() === 'low') {
+        this.budget = 'Under $500';
+      } else if (normalizedBudget.toLowerCase() === 'mid') {
+        this.budget = '$1,000 - $2,500';
+      } else if (normalizedBudget.toLowerCase() === 'high') {
+        this.budget = '$5,000 - $10,000';
+      } else {
+        this.budget = '$1,000 - $2,500'; // Default
+      }
+    } else {
+      this.budget = normalizedBudget;
+    }
+  }
+  
+  next();
+});
 
 const Trip = mongoose.model('Trip', tripSchema);
 

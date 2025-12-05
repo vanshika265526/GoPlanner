@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './Button';
 import { ThemeToggle } from './ThemeToggle';
@@ -6,12 +6,27 @@ import { AppFooter } from './AppFooter';
 // Removed Firebase authService import - using backend API now
 
 export const UserDashboard = ({ onBack, onCreateTrip, onSavedPlans }) => {
-  const { user, logout, loading } = useAuth();
+  const { user, logout, loading, isAuthenticated, refreshAuth } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  console.log('UserDashboard render - loading:', loading, 'user:', user, 'isAuthenticated:', useAuth().isAuthenticated);
+  // Refresh auth on mount if user is missing but token exists
+  useEffect(() => {
+    if (!loading && !user && localStorage.getItem('goplanner_token')) {
+      console.log('UserDashboard: Token exists but user is null, refreshing auth...');
+      refreshAuth();
+    }
+  }, [loading, user, refreshAuth]);
+
+  // Debug logging
+  console.log('UserDashboard render:', { 
+    loading, 
+    user: user ? { id: user.id, name: user.name, email: user.email, emailVerified: user.emailVerified } : null,
+    isAuthenticated,
+    hasToken: !!localStorage.getItem('goplanner_token'),
+    hasUserInStorage: !!localStorage.getItem('goplanner_user')
+  });
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -123,11 +138,11 @@ export const UserDashboard = ({ onBack, onCreateTrip, onSavedPlans }) => {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background-light text-slate-900 dark:bg-[#020617] dark:text-white transition-colors">
+    <div className="relative min-h-screen flex flex-col overflow-hidden bg-background-light text-slate-900 dark:bg-[#020617] dark:text-white transition-colors">
       <div className="backdrop-grid" aria-hidden />
       <div className="aurora-layer" aria-hidden />
 
-      <div className="relative z-10 flex flex-col min-h-screen">
+      <div className="relative z-10 flex-1 flex flex-col">
         <header className="px-6 sm:px-10 pt-8 pb-6">
           <div className="flex items-center justify-between gap-4">
             <button
@@ -279,58 +294,62 @@ export const UserDashboard = ({ onBack, onCreateTrip, onSavedPlans }) => {
             </section>
 
             {/* Account Actions Section */}
-            <section className="glass-panel rounded-[32px] p-6 text-center space-y-4">
-              <Button
-                variant="secondary"
-                onClick={handleLogout}
-                isLoading={isLoggingOut}
-                disabled={isLoggingOut || isDeletingAccount}
-                className="h-14 px-8"
-                icon="logout"
-              >
-                Sign Out
-              </Button>
-              
+            <section className="glass-panel rounded-[32px] p-6">
               {showDeleteConfirm ? (
-                <div className="space-y-3 p-4 rounded-2xl bg-red-500/10 border border-red-500/30">
-                  <p className="text-sm font-semibold text-red-600 dark:text-red-400">
-                    Are you sure you want to delete your account? This action cannot be undone and will delete all your saved plans.
-                  </p>
-                  <div className="flex gap-3 justify-center">
-                    <Button
-                      variant="secondary"
-                      onClick={() => setShowDeleteConfirm(false)}
-                      disabled={isDeletingAccount}
-                      className="h-10 px-6"
-                    >
-                      Cancel
-                    </Button>
-                    <button
-                      onClick={handleDeleteAccount}
-                      disabled={isDeletingAccount}
-                      className="h-10 px-6 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                      {isDeletingAccount ? (
-                        <span className="material-symbols-outlined animate-spin">progress_activity</span>
-                      ) : (
-                        <>
-                          <span className="material-symbols-outlined">delete_forever</span>
-                          <span>Delete Account</span>
-                        </>
-                      )}
-                    </button>
+                <div className="space-y-4">
+                  <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30">
+                    <p className="text-sm font-semibold text-red-600 dark:text-red-400 text-center mb-4">
+                      Are you sure you want to delete your account? This action cannot be undone and will delete all your saved plans as well.
+                    </p>
+                    <div className="flex gap-3 justify-center">
+                      <Button
+                        variant="secondary"
+                        onClick={() => setShowDeleteConfirm(false)}
+                        disabled={isDeletingAccount}
+                        className="h-10 px-6"
+                      >
+                        Cancel
+                      </Button>
+                      <button
+                        onClick={handleDeleteAccount}
+                        disabled={isDeletingAccount}
+                        className="h-10 px-6 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        {isDeletingAccount ? (
+                          <span className="material-symbols-outlined animate-spin">progress_activity</span>
+                        ) : (
+                          <>
+                            <span className="material-symbols-outlined">delete_forever</span>
+                            <span>Delete Account</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : (
-                <Button
-                  variant="secondary"
-                  onClick={handleDeleteAccount}
-                  disabled={isLoggingOut || isDeletingAccount}
-                  className="h-14 px-8 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800"
-                  icon="delete_forever"
-                >
-                  Delete Account
-                </Button>
+                <div className="flex gap-4 justify-between items-center">
+                  <Button
+                    variant="secondary"
+                    onClick={handleLogout}
+                    isLoading={isLoggingOut}
+                    disabled={isLoggingOut || isDeletingAccount}
+                    className="h-14 px-8 flex-1"
+                    icon="logout"
+                  >
+                    Sign Out
+                  </Button>
+                  
+                  <Button
+                    variant="secondary"
+                    onClick={handleDeleteAccount}
+                    disabled={isLoggingOut || isDeletingAccount}
+                    className="h-14 px-8 flex-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800"
+                    icon="delete_forever"
+                  >
+                    Delete Account
+                  </Button>
+                </div>
               )}
             </section>
           </div>

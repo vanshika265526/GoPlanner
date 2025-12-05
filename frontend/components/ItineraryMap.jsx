@@ -123,7 +123,7 @@ export const ItineraryMap = ({ activities = [], destination, coordinates }) => {
     if (!map) return null;
     
     return (
-      <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+      <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2 bg-white dark:bg-[#020617] rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
         <button
           onClick={() => map.zoomIn()}
           className="px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex items-center justify-center"
@@ -168,7 +168,7 @@ export const ItineraryMap = ({ activities = [], destination, coordinates }) => {
 
   if (!isClient || typeof window === 'undefined') {
     return (
-      <div className="w-full h-full bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center border border-slate-200 dark:border-slate-700">
+      <div className="w-full h-full bg-slate-100 dark:bg-[#020617] rounded-2xl flex items-center justify-center border border-slate-200 dark:border-slate-700">
         <div className="text-center p-4">
           <span className="material-symbols-outlined text-4xl text-slate-400 mb-2 animate-pulse">map</span>
           <p className="text-slate-500 dark:text-slate-400">Loading map...</p>
@@ -179,7 +179,7 @@ export const ItineraryMap = ({ activities = [], destination, coordinates }) => {
 
   if (!MapComponents) {
     return (
-      <div className="w-full h-full bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center border border-slate-200 dark:border-slate-700">
+      <div className="w-full h-full bg-slate-100 dark:bg-[#020617] rounded-2xl flex items-center justify-center border border-slate-200 dark:border-slate-700">
         <div className="text-center p-4">
           <span className="material-symbols-outlined text-4xl text-slate-400 mb-2">map</span>
           <p className="text-slate-500 dark:text-slate-400">Initializing map...</p>
@@ -202,7 +202,7 @@ export const ItineraryMap = ({ activities = [], destination, coordinates }) => {
 
   if (validActivities.length === 0 && !coordinates) {
     return (
-      <div className="w-full h-full bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center border border-slate-200 dark:border-slate-700">
+      <div className="w-full h-full bg-slate-100 dark:bg-[#020617] rounded-2xl flex items-center justify-center border border-slate-200 dark:border-slate-700">
         <div className="text-center p-4">
           <span className="material-symbols-outlined text-4xl text-slate-400 mb-2">map</span>
           <p className="text-slate-500 dark:text-slate-400">Map will appear when locations are available</p>
@@ -292,7 +292,7 @@ export const ItineraryMap = ({ activities = [], destination, coordinates }) => {
       </MapContainer>
       
       {/* Map legend */}
-      <div className="absolute bottom-4 left-4 z-[1000] bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-3 text-xs">
+      <div className="absolute bottom-4 left-4 z-[1000] bg-white dark:bg-[#020617] rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-3 text-xs">
         <p className="font-semibold text-slate-900 dark:text-white mb-2">Legend</p>
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
@@ -311,7 +311,7 @@ export const ItineraryMap = ({ activities = [], destination, coordinates }) => {
       </div>
       
       {/* Instructions */}
-      <div className="absolute top-4 left-4 z-[1000] bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-2 text-xs text-slate-600 dark:text-slate-400">
+      <div className="absolute top-4 left-4 z-[1000] bg-white/95 dark:bg-[#020617]/95 backdrop-blur-sm rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-2 text-xs text-slate-600 dark:text-slate-400">
         <p>🖱️ Scroll to zoom • Double-click to zoom in</p>
       </div>
     </div>

@@ -46,6 +46,18 @@ const ChatBot = () => {
     }
   }, [isOpen]);
 
+  // Listen for custom event to open chatbot
+  useEffect(() => {
+    const handleOpenChat = () => {
+      setIsOpen(true);
+    };
+
+    window.addEventListener('openChatBot', handleOpenChat);
+    return () => {
+      window.removeEventListener('openChatBot', handleOpenChat);
+    };
+  }, []);
+
   const handleSendMessage = async (text = null) => {
     const messageText = text || inputValue.trim();
     if (!messageText) return;
@@ -134,7 +146,7 @@ const ChatBot = () => {
           </div>
 
           {/* Messages Container */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50 dark:bg-slate-800/30">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50 dark:bg-[#020617]/30">
             {messages.map((message) => (
               <div
                 key={message.id}
@@ -197,7 +209,7 @@ const ChatBot = () => {
           </div>
 
           {/* Input Area */}
-          <div className="p-4 border-t border-slate-200/50 dark:border-white/10 bg-white/50 dark:bg-slate-800/50">
+          <div className="p-4 border-t border-slate-200/50 dark:border-white/10 bg-white/50 dark:bg-[#020617]/50">
             <div className="flex items-end gap-2">
               <div className="flex-1 relative">
                 <textarea

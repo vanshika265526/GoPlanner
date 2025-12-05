@@ -27,16 +27,55 @@ export const SamplePlanPage = ({ plan, onBack, onEdit, onDashboard }) => {
   useEffect(() => {
     // Scroll to top when component mounts
     window.scrollTo({ top: 0, behavior: 'instant' });
+    
+    // Add class to body, html, and root to override min-height via CSS
+    const body = document.body;
+    const root = document.getElementById('root');
+    const html = document.documentElement;
+    
+    // Add class to trigger CSS override
+    body.classList.add('sample-plan-page');
+    if (root) root.classList.add('sample-plan-page');
+    html.classList.add('sample-plan-page');
+    
+    // Also set inline styles as backup
+    body.style.setProperty('min-height', 'auto', 'important');
+    body.style.setProperty('height', 'auto', 'important');
+    
+    if (root) {
+      root.style.setProperty('min-height', 'auto', 'important');
+      root.style.setProperty('height', 'auto', 'important');
+    }
+    
+    html.style.setProperty('min-height', 'auto', 'important');
+    html.style.setProperty('height', 'auto', 'important');
+    
+    return () => {
+      // Remove classes
+      body.classList.remove('sample-plan-page');
+      if (root) root.classList.remove('sample-plan-page');
+      html.classList.remove('sample-plan-page');
+      
+      // Remove inline styles
+      body.style.removeProperty('min-height');
+      body.style.removeProperty('height');
+      if (root) {
+        root.style.removeProperty('min-height');
+        root.style.removeProperty('height');
+      }
+      html.style.removeProperty('min-height');
+      html.style.removeProperty('height');
+    };
   }, []);
 
   if (!plan) return null;
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background-light text-slate-900 dark:bg-[#020617] dark:text-white transition-colors">
+    <div className="relative bg-background-light text-slate-900 dark:bg-slate-900 dark:text-white transition-colors" style={{ height: 'fit-content', minHeight: 'auto' }}>
       <div className="backdrop-grid" aria-hidden />
       <div className="aurora-layer" aria-hidden />
 
-      <div className="relative z-10 flex flex-col min-h-screen">
+      <div className="relative z-10">
         <PageHeader
           onBack={onBack}
           onDashboard={onDashboard}
@@ -44,7 +83,7 @@ export const SamplePlanPage = ({ plan, onBack, onEdit, onDashboard }) => {
           subtitle="Sample Trip Plan"
         />
 
-        <main className="flex-1 px-6 sm:px-10 pb-16 space-y-12">
+        <main className="px-6 sm:px-10 pb-0 space-y-12 max-w-7xl mx-auto" style={{ marginBottom: 0 }}>
           <section className="relative overflow-hidden rounded-[40px] border border-white/20 bg-white/70 dark:bg-white/5">
             <div
               className="absolute inset-0"
@@ -134,7 +173,7 @@ export const SamplePlanPage = ({ plan, onBack, onEdit, onDashboard }) => {
             ))}
           </section>
 
-          <section className="glass-panel rounded-[32px] p-6 text-center space-y-4">
+          <section className="glass-panel rounded-[32px] p-6 text-center space-y-4 mb-0">
             <p className="text-base text-slate-700 dark:text-white/70">
             Like it? As soon as you tap Edit Plan, all the details will pop right into the planner form—ready for you to tweak.
             </p>
@@ -148,9 +187,9 @@ export const SamplePlanPage = ({ plan, onBack, onEdit, onDashboard }) => {
             </div>
           </section>
         </main>
-
-        <AppFooter />
       </div>
+      
+      <AppFooter />
     </div>
   );
 };

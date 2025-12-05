@@ -231,7 +231,7 @@ export const LandingScreen = ({ onStartPlanning, onViewSamplePlan, onOpenAuth, o
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background-light text-slate-900 dark:bg-[#020617] dark:text-white transition-colors">
+    <div className="relative min-h-screen overflow-hidden bg-background-light text-slate-900 dark:bg-[#020617] dark:text-slate-100 transition-colors">
       <div className="backdrop-grid" aria-hidden />
       <div className="aurora-layer" aria-hidden />
 
@@ -300,7 +300,7 @@ export const LandingScreen = ({ onStartPlanning, onViewSamplePlan, onOpenAuth, o
                 className="text-slate-500 hover:text-primary dark:text-white/60 dark:hover:text-primary transition-colors"
                 onClick={() => onContactUs?.()}
               >
-                Contact us
+                Contact Us
               </button>
               {isAuthenticated && (
                 <button
@@ -517,34 +517,67 @@ export const LandingScreen = ({ onStartPlanning, onViewSamplePlan, onOpenAuth, o
               <div className="absolute inset-0 bg-gradient-to-br from-primary/30 to-transparent blur-3xl" aria-hidden />
               <div className="glass-panel rounded-[40px] p-8 space-y-6 tilt-card">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm uppercase tracking-[0.35em] text-slate-500 dark:text-white/50">Live collaboration</p>
-                  <span className="px-3 py-1 rounded-full bg-white/90 text-xs font-semibold text-slate-700 dark:bg-white/10 dark:text-white transition-colors">Beta</span>
+                  <p className="text-sm uppercase tracking-[0.35em] text-slate-500 dark:text-white/50">Export & Share</p>
+                  <span className="px-3 py-1 rounded-full bg-green-500/20 text-green-600 dark:text-green-400 text-xs font-semibold transition-colors">Available</span>
                 </div>
                 <div className="rounded-3xl bg-white/5 border border-white/10 p-6 flex flex-col gap-6">
                   <div>
-                    <p className="text-sm text-slate-600 dark:text-white/60">Now editing</p>
-                    <div className="mt-3 flex -space-x-3">
-                      {['KE', 'AM', 'JR'].map((initials) => (
-                        <span
-                          key={initials}
-                          className="size-10 rounded-full bg-primary/30 border border-white/20 flex items-center justify-center font-semibold"
+                    <p className="text-sm text-slate-600 dark:text-white/60 mb-4">Download your plan</p>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="flex items-center justify-center rounded-2xl bg-primary/20 p-3">
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="w-6 h-6 text-primary"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
                         >
-                          {initials}
-                        </span>
-                      ))}
-                      <span className="size-10 rounded-full border border-dashed border-white/30 flex items-center justify-center text-white/40">
-                        +
-                      </span>
+                          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                          <path d="M7 10l5 5 5-5" />
+                          <path d="M12 15V3" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-900 dark:text-white">PDF Download</p>
+                        <p className="text-xs text-slate-600 dark:text-white/60">Save your itinerary offline</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center rounded-2xl bg-primary/20 p-3">
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="w-6 h-6 text-primary"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <circle cx="18" cy="5" r="3" />
+                          <circle cx="6" cy="12" r="3" />
+                          <circle cx="18" cy="19" r="3" />
+                          <path d="M8.59 13.51l6.83 3.98" />
+                          <path d="M15.41 6.51l-6.82 3.98" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-900 dark:text-white">Share Instantly</p>
+                        <p className="text-xs text-slate-600 dark:text-white/60">Share with friends via Web Share API</p>
+                      </div>
                     </div>
                   </div>
-                  <div className="space-y-3">
+                  <div className="space-y-3 pt-2 border-t border-white/10">
                     <div className="flex items-center justify-between text-sm text-slate-700 dark:text-white/70">
-                      <p>Friends can reorder, toggle budgets, and suggest POIs in real time.</p>
+                      <p>Download your complete itinerary as PDF or share it instantly with friends and family.</p>
                     </div>
-                    <div className="h-2 rounded-full bg-white/10 overflow-hidden">
-                      <div className="h-full w-3/4 rounded-full bg-gradient-to-r from-blue-400 to-cyan-300 animate-gradient" />
+                    <div className="flex gap-2">
+                      <div className="flex-1 h-2 rounded-full bg-white/10 overflow-hidden">
+                        <div className="h-full w-full rounded-full bg-gradient-to-r from-green-400 to-emerald-300" />
+                      </div>
                     </div>
-                    <p className="text-xs uppercase tracking-[0.4em] text-slate-400 dark:text-white/40">0 lag • 100% drama free</p>
+                    <p className="text-xs uppercase tracking-[0.4em] text-slate-400 dark:text-white/40">100% Free • No Limits</p>
                   </div>
                 </div>
               </div>

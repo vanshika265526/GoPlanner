@@ -1,6 +1,7 @@
 import React from 'react';
 import { PageHeader } from './PageHeader';
 import { Button } from './Button';
+import { AppFooter } from './AppFooter';
 
 const FeatureCard = ({ icon, title, description }) => (
   <div className="glass-panel rounded-[32px] p-6 space-y-4 tilt-card hover:scale-[1.02] transition-transform">
@@ -159,7 +160,7 @@ export const AboutUs = ({ onBack, onDashboard, onStartPlanning }) => {
   ];
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background-light text-slate-900 dark:bg-[#020617] dark:text-white transition-colors">
+    <div className="relative min-h-screen flex flex-col overflow-hidden bg-background-light text-slate-900 dark:bg-[#020617] dark:text-white transition-colors">
       <div className="backdrop-grid" aria-hidden />
       <div className="aurora-layer" aria-hidden />
 
@@ -170,7 +171,7 @@ export const AboutUs = ({ onBack, onDashboard, onStartPlanning }) => {
         subtitle="Your ultimate travel planning companion"
       />
 
-      <div className="relative z-10 max-w-7xl mx-auto px-6 py-12 space-y-20">
+      <div className="relative z-10 flex-1 max-w-7xl mx-auto px-6 py-12 space-y-20">
         {/* Hero Section */}
         <section className="text-center space-y-6">
           <div className="inline-flex items-center justify-center rounded-full bg-primary/10 px-4 py-2 mb-4">
